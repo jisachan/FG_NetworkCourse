@@ -50,13 +50,13 @@ public:
 	void Server_SendLocation(const FVector& LocationToSend);
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void Mulitcast_SendLcation(const FVector& LocationToSend);
+	void Mulitcast_SendLocation(const FVector& LocationToSend);
 
 	UFUNCTION(Server, Unreliable)
-	void Server_SendRotation(const FRotator& RotationToSend);
+	void Server_SendRotation(const FQuat& RotationToSend);
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void Mulitcast_SendRotation(const FRotator& RotationToSend);
+	void Mulitcast_SendRotation(const FQuat& RotationToSend);
 
 private:
 	void Handle_Accelerate(float Value);
@@ -72,6 +72,9 @@ private:
 
 	bool bIsBraking = false;
 
+	FVector TargetLocation;
+	FQuat TargetRotation;
+
 	UPROPERTY(VisibleDefaultsOnly, Category = Collision)
 	USphereComponent* CollisionComponent;
 
@@ -86,4 +89,10 @@ private:
 
 	UPROPERTY(VisibleDefaultsOnly, Category = Movement)
 	UFGMovementComponent* MovementComponent;
+
+	UPROPERTY(EditAnywhere, Category = Movement, Meta = (Tooltip = "How fast to interpolate(lerp) the actor location for a smooth movement. Lower number is smoother.", ClampMin = "0", ClampMax = "100"))
+	float MovementSmootheningSpeed = 10.f;
+
+	UPROPERTY(EditAnywhere, Category = Movement, Meta = (Tooltip = "How fast to interpolate(lerp) the actor rotation for a smooth rotation movement. Lower number is smoother.", ClampMin = "0", ClampMax = "100"))
+	float RotationSmootheningSpeed = 10.f;
 };
