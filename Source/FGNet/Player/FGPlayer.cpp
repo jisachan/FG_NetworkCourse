@@ -282,6 +282,7 @@ void AFGPlayer::FireRocket()
 		else
 		{
 			NumRockets--;
+			BP_OnNumRocketsChanged(NumRockets);
 			NewRocket->StartMoving(GetActorForwardVector(), GetRocketStartLocation());
 			Server_FireRocket(NewRocket, GetRocketStartLocation(), GetActorRotation());
 		}
@@ -299,6 +300,7 @@ void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, 
 		const float DeltaYaw = FMath::FindDeltaAngleDegrees(RocketFacingRotation.Yaw, GetActorForwardVector().Rotation().Yaw) * 0.5f;
 		const FRotator NewFacingRotation = RocketFacingRotation + FRotator(0.0f, DeltaYaw, 0.0f);
 		ServerNumRockets--;
+		//BP_OnNumRocketsChanged(ServerNumRockets);
 		Multicast_FireRocket(NewRocket, RocketStartLocation, NewFacingRotation);
 	}
 }
@@ -317,6 +319,7 @@ void AFGPlayer::Multicast_FireRocket_Implementation(UFGRocketComponent* NewRocke
 	else
 	{
 		NumRockets--;
+		BP_OnNumRocketsChanged(NumRockets);
 		NewRocket->StartMoving(RocketFacingRotation.Vector(), RocketStartLocation);
 	}
 }
@@ -331,6 +334,7 @@ void AFGPlayer::Cheat_IncreaseRockets(int32 InNumRockets)
 	if (IsLocallyControlled())
 	{
 		NumRockets += InNumRockets;
+		BP_OnNumRocketsChanged(NumRockets);
 	}
 }
 
@@ -465,14 +469,21 @@ void AFGPlayer::OnPickup(APickup* Pickup)
 void AFGPlayer::Server_OnPickup_Implementation(APickup* Pickup)
 {
 	ServerNumRockets += Pickup->NumRockets;
-	Client_OnPickupRockets(Pickup->NumRockets);
+	NumRockets += Pickup->NumRockets;
+	BP_OnNumRocketsChanged(NumRockets);
+	//Client_OnPickupRockets(Pickup->NumRockets);
 }
 
-void AFGPlayer::Client_OnPickupRockets_Implementation(int32 PickedUpRockets)
+void AFGPlayer::OnRepNumRocketsChanged()
 {
-	NumRockets += PickedUpRockets;
 	BP_OnNumRocketsChanged(NumRockets);
 }
+
+//void AFGPlayer::Client_OnPickupRockets_Implementation(int32 PickedUpRockets)
+//{
+//		NumRockets += PickedUpRockets;
+//		BP_OnNumRocketsChanged(NumRockets);
+//}
 
 void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -482,4 +493,5 @@ void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME(AFGPlayer, ReplicatedLocation);
 	//DOREPLIFETIME(AFGPlayer, RocketInstances);
 	DOREPLIFETIME(AFGPlayer, RocketCompInstances);
+	DOREPLIFETIME(AFGPlayer, NumRockets);
 }

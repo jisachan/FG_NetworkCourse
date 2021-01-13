@@ -54,8 +54,8 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_OnPickup(APickup* Pickup);
 
-	UFUNCTION(Client, Reliable)
-	void Client_OnPickupRockets(int32 PickedUpRockets);
+	/*UFUNCTION(Client, Reliable)
+	void Client_OnPickupRockets(int32 PickedUpRockets);*/
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Mulitcast_SendTransform(const FTransform& TransformToSend);
@@ -69,6 +69,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = Player, meta = (DisplayName = "On Num Rockets Changed"))
 	void BP_OnNumRocketsChanged(int32 NewNumRockets);
 
+
 	void AddRocketInstances(UFGRocketComponent* RocketComp) {RocketCompInstances.Add(RocketComp) ;}
 	//
 	void FireRocket();
@@ -77,9 +78,13 @@ public:
 
 private:
 
-	//
 	int32 ServerNumRockets = 0;
+
+	UPROPERTY(Replicated, ReplicatedUsing=OnRepNumRocketsChanged)
 	int32 NumRockets = 0;
+
+	UFUNCTION()
+	void OnRepNumRocketsChanged();
 
 	FVector GetRocketStartLocation() const;
 	UFGRocketComponent* GetFreeRocket() const;
