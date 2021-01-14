@@ -37,15 +37,7 @@ AFGPlayer::AFGPlayer()
 
 	MovementComponent = CreateDefaultSubobject<UFGMovementComponent>(TEXT("MovementComponent"));
 
-	//	RocketComponent = CreateDefaultSubobject<UFGRocketComponent>(TEXT("RocketComponent"));
 	RocketSpawner = CreateDefaultSubobject<URocketSpawner>(TEXT("RocketSpawner"));
-
-	//for (int32 i = 0; i < 8; i++)
-	//{
-	//RocketComponent = CreateDefaultSubobject<UFGRocketComponent>(*FString("Rocket Component"/* + FString::FromInt(i+1)*/));
-	//RocketCompClass = CreateDefaultSubobject<UFGRocketComponent>(*FString("Rocket Component Class"));
-	/*	RocketCompInstances.Add(RocketComponent);
-	}*/
 
 	SetReplicateMovement(false);
 }
@@ -62,7 +54,18 @@ void AFGPlayer::BeginPlay()
 		DebugMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
+	if (IsLocallyControlled())
+	{
+		if (HasAuthority())
+		{
+			ServerNumRockets = AmmoAtStart;
+			NumRockets = AmmoAtStart;
+			BP_OnNumRocketsChanged(NumRockets);
+		}
+	}
+
 	SpawnRockets();
+	BP_OnNumRocketsChanged(NumRockets);
 
 	OriginalMeshOffset = MeshComponent->GetRelativeLocation();
 }
@@ -342,7 +345,7 @@ void AFGPlayer::SpawnRockets()
 {
 	if (HasAuthority())
 	{
-		const int32 RocketCache = 8;
+		const int32 RocketCache = AmmoAtStart;
 
 		for (int32 Index = 0; Index < RocketCache; ++Index)
 		{
@@ -360,7 +363,6 @@ FVector AFGPlayer::GetRocketStartLocation() const
 
 UFGRocketComponent* AFGPlayer::GetFreeRocket() const
 {
-
 	for (UFGRocketComponent* Rocket : RocketCompInstances)
 	{
 		if (Rocket == nullptr)
@@ -379,16 +381,6 @@ UFGRocketComponent* AFGPlayer::GetFreeRocket() const
 
 int32 AFGPlayer::GetNumActiveRockets() const
 {
-	//int32 NumActive = 0;
-	//for (AFGRocket* Rocket : RocketInstances)
-	//{
-	//	if (!Rocket->IsFree())
-	//	{
-	//		NumActive++;
-	//	}
-	//}
-	//return NumActive;
-
 	int32 NumActive = 0;
 	for (UFGRocketComponent* Rocket : RocketCompInstances)
 	{
@@ -470,20 +462,18 @@ void AFGPlayer::Server_OnPickup_Implementation(APickup* Pickup)
 {
 	ServerNumRockets += Pickup->NumRockets;
 	NumRockets += Pickup->NumRockets;
+	if (NumRockets > AmmoCapacity)
+	{
+		NumRockets = AmmoCapacity;
+		ServerNumRockets = AmmoCapacity;
+	}
 	BP_OnNumRocketsChanged(NumRockets);
-	//Client_OnPickupRockets(Pickup->NumRockets);
 }
 
 void AFGPlayer::OnRepNumRocketsChanged()
 {
 	BP_OnNumRocketsChanged(NumRockets);
 }
-
-//void AFGPlayer::Client_OnPickupRockets_Implementation(int32 PickedUpRockets)
-//{
-//		NumRockets += PickedUpRockets;
-//		BP_OnNumRocketsChanged(NumRockets);
-//}
 
 void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {

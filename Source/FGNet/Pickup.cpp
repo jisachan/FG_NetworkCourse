@@ -6,6 +6,7 @@
 #include "TimerManager.h"
 #include "Player/FGPlayer.h"
 #include "Net/UnrealNetwork.h"
+#include "Components/FGRocketComponent.h"
 
 APickup::APickup()
 {
@@ -65,6 +66,11 @@ void APickup::ReActivatePickup()
 void APickup::OverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (bPickedUp)
+	{
+		return;
+	}
+
+	if (Cast<UFGRocketComponent>(OtherComp))
 	{
 		return;
 	}

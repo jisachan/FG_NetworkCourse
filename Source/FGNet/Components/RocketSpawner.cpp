@@ -38,4 +38,3 @@ void URocketSpawner::SpawnRocket()
 		Player->AddRocketInstances(NewComp);		
 	}
 }
-
