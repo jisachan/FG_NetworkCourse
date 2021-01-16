@@ -34,6 +34,8 @@ void URocketSpawner::SpawnRocket()
 		//NewComp->RegisterComponent();
 		NewComp->RegisterComponentWithWorld(World);
 		NewComp->SetStaticMesh(Mesh);
+		NewComp->SetVisibility(false);
+		NewComp->SetWorldLocation(FVector(-1000.f, -1000.f, -1000.f));
 		AFGPlayer* Player = Cast<AFGPlayer>(GetOwner());
 		Player->AddRocketInstances(NewComp);		
 	}

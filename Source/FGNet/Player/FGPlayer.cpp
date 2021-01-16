@@ -13,7 +13,6 @@
 #include "PlayerSetting.h"
 #include "../DebugWidget.h"
 #include "../Pickup.h"
-#include "../FGRocket.h"
 #include "../Components/FGRocketComponent.h"
 #include "../Components/RocketSpawner.h"
 #include <Components/ActorComponent.h>
@@ -38,7 +37,6 @@ AFGPlayer::AFGPlayer()
 	MovementComponent = CreateDefaultSubobject<UFGMovementComponent>(TEXT("MovementComponent"));
 
 	RocketSpawner = CreateDefaultSubobject<URocketSpawner>(TEXT("RocketSpawner"));
-
 	SetReplicateMovement(false);
 }
 
@@ -54,18 +52,17 @@ void AFGPlayer::BeginPlay()
 		DebugMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	if (IsLocallyControlled())
+	if (HasAuthority())
 	{
-		if (HasAuthority())
-		{
-			ServerNumRockets = AmmoAtStart;
-			NumRockets = AmmoAtStart;
-			BP_OnNumRocketsChanged(NumRockets);
-		}
+		ServerNumRockets = AmmoAtStart;
+		NumRockets = AmmoAtStart;
+		BP_OnNumRocketsChanged(NumRockets);
 	}
+
 
 	SpawnRockets();
 	BP_OnNumRocketsChanged(NumRockets);
+	BP_OnHealthChanged(Health);
 
 	OriginalMeshOffset = MeshComponent->GetRelativeLocation();
 }
@@ -155,6 +152,14 @@ int32 AFGPlayer::GetPing() const
 	}
 
 	return 0;
+}
+
+void AFGPlayer::BP_OnBeginMarriage(bool bInSickness, bool bInHealth)
+{
+	if (bInSickness && bInHealth)
+	{
+		bIsMarried = true;
+	}
 }
 
 void AFGPlayer::Server_SendTransform_Implementation(const FTransform& TransformToSend)
@@ -290,6 +295,22 @@ void AFGPlayer::FireRocket()
 			Server_FireRocket(NewRocket, GetRocketStartLocation(), GetActorRotation());
 		}
 	}
+}
+
+void AFGPlayer::TakeDamage(float Damage)
+{
+	if (HasAuthority())
+	{
+		Health -= Damage;
+		BP_OnHealthChanged(Health);
+		UE_LOG(LogTemp, Warning, TEXT("Health: %f"), Health);
+		if (Health <= 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Dead"));
+			this->Destroy();
+		}
+	}
+
 }
 
 void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation)
@@ -475,6 +496,12 @@ void AFGPlayer::OnRepNumRocketsChanged()
 	BP_OnNumRocketsChanged(NumRockets);
 }
 
+
+void AFGPlayer::OnRepHealthChanged()
+{
+	BP_OnHealthChanged(Health);
+}
+
 void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -484,4 +511,5 @@ void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	//DOREPLIFETIME(AFGPlayer, RocketInstances);
 	DOREPLIFETIME(AFGPlayer, RocketCompInstances);
 	DOREPLIFETIME(AFGPlayer, NumRockets);
+	DOREPLIFETIME(AFGPlayer, Health);
 }

@@ -15,7 +15,7 @@ class FGNET_API URocketSpawner : public UActorComponent
 public:	
 	// Sets default values for this component's properties
 	URocketSpawner();
-
+	//               ?../ jhb+6
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -28,4 +28,7 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 		void SpawnRocket();
+
+		UFUNCTION(BlueprintCallable)
+		UStaticMesh* GetMesh() {return Mesh; }
 };

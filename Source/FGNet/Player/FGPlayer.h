@@ -26,15 +26,15 @@ public:
 		UPlayerSetting* PlayerSetting = nullptr;
 
 protected:
-	
-	UPROPERTY(EditAnywhere, Category = PlayerStats);
+
+	UPROPERTY(Replicated, ReplicatedUsing = OnRepHealthChanged, EditAnywhere, Category = PlayerStats);
 	float Health = 100.f;
 
 	UPROPERTY(EditAnywhere, Category = PlayerStats, meta = (Tooltip = "How much ammo the player is able to carry."))
-	int AmmoCapacity = 20;
+		int AmmoCapacity = 20;
 
 	UPROPERTY(EditAnywhere, Category = PlayerStats, meta = (Tooltip = "How much ammo the player has at the start of game."))
-	int AmmoAtStart = 8;
+		int AmmoAtStart = 8;
 
 private:
 
@@ -138,6 +138,13 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = Player, meta = (DisplayName = "On Num Rockets Changed"))
 		void BP_OnNumRocketsChanged(int32 NewNumRockets);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = Player, meta = (DisplayName = "On Health Changed"))
+		void BP_OnHealthChanged(float InHealth);
+
+	void BP_OnBeginMarriage(bool bInSickness, bool bInHealth);
+
+	bool bIsMarried = false;
+
 #pragma endregion
 
 	UPROPERTY(EditAnywhere, Category = Debug)
@@ -154,6 +161,9 @@ public:
 
 	UFUNCTION(NetMulticast, Unreliable)
 		void Mulitcast_SendTransform(const FTransform& TransformToSend);
+
+	UFUNCTION(BlueprintCallable)
+	void TakeDamage(float Damage);
 
 	void AddRocketInstances(UFGRocketComponent* RocketComp) { RocketCompInstances.Add(RocketComp); }
 
@@ -173,6 +183,9 @@ private:
 
 	UFUNCTION()
 		void OnRepNumRocketsChanged();
+
+	UFUNCTION()
+		void OnRepHealthChanged();
 
 	UFUNCTION(Server, Unreliable)
 		void Server_SendMovement(const FVector& ClientLocation, float TimeStamp, float ClientForward, float ClientYaw);

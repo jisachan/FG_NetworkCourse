@@ -4,6 +4,7 @@
 #include "FGRocketComponent.h"
 #include <DrawDebugHelpers.h>
 #include <Kismet/GameplayStatics.h>
+#include "../Player/FGPlayer.h"
 
 // Sets default values for this component's properties
 UFGRocketComponent::UFGRocketComponent()
@@ -24,6 +25,7 @@ void UFGRocketComponent::BeginPlay()
 	Super::BeginPlay();
 
 	CachedCollisionQueryParams.AddIgnoredActor(GetOwner());
+	this->OnComponentBeginOverlap.AddDynamic(this, &UFGRocketComponent::OverlapBegin);
 
 	//SetRocketVisibility(false);
 }
@@ -61,6 +63,14 @@ void UFGRocketComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 
 	if (Hit.bBlockingHit)
 	{
+		if (AActor* HitActor = Hit.GetActor())
+		{
+			if (AFGPlayer* Player = Cast<AFGPlayer>(HitActor))
+			{
+				Player->TakeDamage(Damage);
+				UE_LOG(LogTemp, Warning, TEXT("Damage: %f"), Damage);
+			}
+		}
 		Explode();
 	}
 
@@ -87,6 +97,22 @@ void UFGRocketComponent::StartMoving(const FVector& Forward, const FVector& InSt
 void UFGRocketComponent::ApplyCorrection(const FVector& Forward)
 {
 	FacingRotationCorrection = Forward.ToOrientationQuat();
+}
+
+
+
+void UFGRocketComponent::OverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (Cast<UFGRocketComponent>(OtherComp) || this->GetOwner() == OtherActor)
+	{
+		return;
+	}
+
+	if (AFGPlayer* Player = Cast<AFGPlayer>(OtherActor))
+	{
+		Player->TakeDamage(Damage);
+		UE_LOG(LogTemp, Warning, TEXT("Damage: %f"), Damage);
+	}
 }
 
 void UFGRocketComponent::Explode()
