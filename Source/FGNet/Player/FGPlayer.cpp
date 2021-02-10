@@ -11,6 +11,7 @@
 #include "Engine/NetDriver.h"
 #include "Net/UnrealNetwork.h"
 #include "PlayerSetting.h"
+#include "PlayerMovementStruct.h"
 #include "../DebugWidget.h"
 #include "../Pickup.h"
 #include "../Components/FGRocketComponent.h"
@@ -38,11 +39,14 @@ AFGPlayer::AFGPlayer()
 
 	RocketSpawner = CreateDefaultSubobject<URocketSpawner>(TEXT("RocketSpawner"));
 	SetReplicateMovement(false);
+
 }
 
 void AFGPlayer::BeginPlay()
 {
 	Super::BeginPlay();
+
+	PlayerMovement.SetMovementData(MoveData);
 
 	MovementComponent->SetUpdatedComponent(CollisionComponent);
 
@@ -58,7 +62,6 @@ void AFGPlayer::BeginPlay()
 		NumRockets = AmmoAtStart;
 		BP_OnNumRocketsChanged(NumRockets);
 	}
-
 
 	SpawnRockets();
 	BP_OnNumRocketsChanged(NumRockets);
@@ -79,23 +82,21 @@ void AFGPlayer::Tick(float DeltaTime)
 	{
 		ClientTimeStamp += DeltaTime;
 
-		if (PlayerSetting == nullptr)
+		if (PlayerMovement.MovementData == nullptr)
 		{
 			return;
 		}
 
-		const float MaxVelocity = PlayerSetting->MaxVelocity;
-		const float Friction = IsBraking() ? PlayerSetting->BrakingFriction : PlayerSetting->Friction;
+		const float MaxVelocity = PlayerMovement.MovementData->MaxVelocity;
+		const float Friction = IsBraking() ? PlayerMovement.MovementData->BrakingFriction : PlayerMovement.MovementData->Friction;
 		const float Alpha = FMath::Clamp(FMath::Abs(MovementVelocity / (MaxVelocity * 0.75F)), 0.0F, 1.0F);
-		const float TurnSpeed = FMath::InterpEaseOut(0.0F, PlayerSetting->TurnSpeedDefault, Alpha, 5.0F);
+		const float TurnSpeed = FMath::InterpEaseOut(0.0F, PlayerMovement.MovementData->TurnSpeedDefault, Alpha, 5.0F);
 		const float TurnDirection = MovementVelocity > 0.0F ? Turn : -Turn;
 
 		Yaw += (TurnDirection * TurnSpeed) * DeltaTime;
 		FQuat WantedFacingDirection = FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
 		MovementComponent->SetFacingRotation(WantedFacingDirection);
 
-		//MovementVelocity += Forward * PlayerSetting->Acceleration * DeltaTime;
-		//MovementVelocity = FMath::Clamp(MovementVelocity, -PlayerSetting->MaxVelocity, PlayerSetting->MaxVelocity);
 		AddMovementVelocity(DeltaTime);
 		MovementVelocity *= FMath::Pow(Friction, DeltaTime);
 
@@ -103,13 +104,11 @@ void AFGPlayer::Tick(float DeltaTime)
 		FrameMovement.AddDelta(GetActorForwardVector() * MovementVelocity * DeltaTime);
 		MovementComponent->Move(FrameMovement);
 
-		//Server_SendTransform(GetActorTransform());
-		//Server_SendYaw(MovementComponent->GetFacingRotation().Yaw);
 		Server_SendMovement(GetActorLocation(), ClientTimeStamp, Forward, GetActorRotation().Yaw);
 	}
 	else
 	{
-		const float Friction = IsBraking() ? PlayerSetting->BrakingFriction : PlayerSetting->Friction;
+		const float Friction = IsBraking() ? PlayerMovement.MovementData->BrakingFriction : PlayerMovement.MovementData->Friction;
 		MovementVelocity *= FMath::Pow(Friction, DeltaTime);
 		FrameMovement.AddDelta(GetActorForwardVector() * MovementVelocity * DeltaTime);
 		MovementComponent->Move(FrameMovement);
@@ -117,16 +116,9 @@ void AFGPlayer::Tick(float DeltaTime)
 		if (bPerformNetworkSmoothing)
 		{
 			const FVector NewRelativeLocation = FMath::VInterpTo(MeshComponent->GetRelativeLocation(), OriginalMeshOffset, LastCorrectionDelta, 1.75f);
-			SetActorLocation(NewRelativeLocation, false, nullptr, ETeleportType::TeleportPhysics);
+			UE_LOG(LogTemp, Warning, TEXT("NewRelativeLocation: %s"), *NewRelativeLocation.ToString());
+			MeshComponent->SetRelativeLocation(NewRelativeLocation);
 		}
-
-		//FVector NewLocation = FMath::VInterpTo(GetActorLocation(), ReplicatedLocation, DeltaTime, LocationLerpSpeed);
-		//SetActorLocation(NewLocation);
-
-		////FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation.Rotator(), DeltaTime, RotationLerpSpeed);
-		////SetActorRotation(NewRotation);
-		//MovementComponent->SetFacingRotation(FRotator(0.0f, ReplicatedYaw, 0.0f));
-		//SetActorRotation(MovementComponent->GetFacingRotation());
 	}
 }
 
@@ -152,29 +144,6 @@ int32 AFGPlayer::GetPing() const
 	}
 
 	return 0;
-}
-
-void AFGPlayer::BP_OnBeginMarriage(bool bInSickness, bool bInHealth)
-{
-	if (bInSickness && bInHealth)
-	{
-		bIsMarried = true;
-	}
-}
-
-void AFGPlayer::Server_SendTransform_Implementation(const FTransform& TransformToSend)
-{
-	//Mulitcast_SendTransform(TransformToSend);
-	ReplicatedLocation = TransformToSend.GetLocation();
-}
-
-void AFGPlayer::Mulitcast_SendTransform_Implementation(const FTransform& TransformToSend)
-{
-	if (!IsLocallyControlled())
-	{
-		TargetLocation = TransformToSend.GetLocation();
-		TargetRotation = TransformToSend.GetRotation();
-	}
 }
 
 const static float MaxMoveDeltaTime = 0.125f;
@@ -215,20 +184,15 @@ void AFGPlayer::Multicast_SendMovement_Implementation(const FVector& InClientLoc
 
 void AFGPlayer::AddMovementVelocity(float DeltaTime)
 {
-	if (!ensure(PlayerSetting != nullptr))
+	if (PlayerMovement.MovementData == nullptr)
 	{
 		return;
 	}
 
-	const float MaxVelocity = PlayerSetting->MaxVelocity;
-	const float Acceleration = PlayerSetting->Acceleration;
+	const float MaxVelocity = PlayerMovement.MovementData->MaxVelocity;
+	const float Acceleration = PlayerMovement.MovementData->Acceleration;
 	MovementVelocity += Forward * Acceleration * DeltaTime;
 	MovementVelocity = FMath::Clamp(MovementVelocity, -MaxVelocity, MaxVelocity);
-}
-
-void AFGPlayer::Server_SendYaw_Implementation(float NewYaw)
-{
-	ReplicatedYaw = NewYaw;
 }
 
 void AFGPlayer::ShowDebugMenu()
@@ -279,7 +243,7 @@ void AFGPlayer::FireRocket()
 		return;
 	}
 
-	FireCooldownElapsed = PlayerSetting->FireCooldown;
+	FireCooldownElapsed = PlayerMovement.MovementData->FireCooldown;
 
 	if (GetLocalRole() >= ROLE_AutonomousProxy)
 	{
@@ -297,7 +261,7 @@ void AFGPlayer::FireRocket()
 	}
 }
 
-void AFGPlayer::TakeDamage(float Damage)
+void AFGPlayer::TakeRocketDamage(float Damage)
 {
 	if (HasAuthority())
 	{
@@ -310,7 +274,6 @@ void AFGPlayer::TakeDamage(float Damage)
 			this->Destroy();
 		}
 	}
-
 }
 
 void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation)
@@ -324,7 +287,6 @@ void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, 
 		const float DeltaYaw = FMath::FindDeltaAngleDegrees(RocketFacingRotation.Yaw, GetActorForwardVector().Rotation().Yaw) * 0.5f;
 		const FRotator NewFacingRotation = RocketFacingRotation + FRotator(0.0f, DeltaYaw, 0.0f);
 		ServerNumRockets--;
-		//BP_OnNumRocketsChanged(ServerNumRockets);
 		Multicast_FireRocket(NewRocket, RocketStartLocation, NewFacingRotation);
 	}
 }
@@ -496,7 +458,6 @@ void AFGPlayer::OnRepNumRocketsChanged()
 	BP_OnNumRocketsChanged(NumRockets);
 }
 
-
 void AFGPlayer::OnRepHealthChanged()
 {
 	BP_OnHealthChanged(Health);
@@ -508,7 +469,6 @@ void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 
 	DOREPLIFETIME(AFGPlayer, ReplicatedYaw);
 	DOREPLIFETIME(AFGPlayer, ReplicatedLocation);
-	//DOREPLIFETIME(AFGPlayer, RocketInstances);
 	DOREPLIFETIME(AFGPlayer, RocketCompInstances);
 	DOREPLIFETIME(AFGPlayer, NumRockets);
 	DOREPLIFETIME(AFGPlayer, Health);

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "GameFramework/Pawn.h"
+#include "PlayerMovementStruct.h"
+
 #include "FGPlayer.generated.h"
 
 class UCameraComponent;
@@ -22,8 +24,10 @@ class FGNET_API AFGPlayer : public APawn
 public:
 	AFGPlayer();
 
+	FPlayerMovementStruct PlayerMovement;
+
 	UPROPERTY(EditAnywhere, Category = Settings)
-		UPlayerSetting* PlayerSetting = nullptr;
+		UPlayerSetting* MoveData = nullptr;
 
 protected:
 
@@ -85,10 +89,10 @@ private:
 	UPROPERTY()
 		FQuat TargetRotation;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 		float LocationLerpSpeed = 5.f;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 		float RotationLerpSpeed = 5.f;
 
 	UPROPERTY(EditAnywhere, Category = Network)
@@ -141,29 +145,16 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = Player, meta = (DisplayName = "On Health Changed"))
 		void BP_OnHealthChanged(float InHealth);
 
-	void BP_OnBeginMarriage(bool bInSickness, bool bInHealth);
-
-	bool bIsMarried = false;
-
 #pragma endregion
 
 	UPROPERTY(EditAnywhere, Category = Debug)
 		TSubclassOf<UDebugWidget> DebugMenuClass;
 
-	UFUNCTION(Server, Unreliable)
-		void Server_SendTransform(const FTransform& TransformToSend);
-
-	UFUNCTION(Server, Unreliable)
-		void Server_SendYaw(float NewYaw);
-
 	UFUNCTION(Server, Reliable)
 		void Server_OnPickup(APickup* Pickup);
 
-	UFUNCTION(NetMulticast, Unreliable)
-		void Mulitcast_SendTransform(const FTransform& TransformToSend);
-
 	UFUNCTION(BlueprintCallable)
-	void TakeDamage(float Damage);
+		void TakeRocketDamage(float Damage);
 
 	void AddRocketInstances(UFGRocketComponent* RocketComp) { RocketCompInstances.Add(RocketComp); }
 

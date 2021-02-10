@@ -67,7 +67,7 @@ void UFGRocketComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		{
 			if (AFGPlayer* Player = Cast<AFGPlayer>(HitActor))
 			{
-				Player->TakeDamage(Damage);
+				Player->TakeRocketDamage(Damage);
 				UE_LOG(LogTemp, Warning, TEXT("Damage: %f"), Damage);
 			}
 		}
@@ -110,7 +110,7 @@ void UFGRocketComponent::OverlapBegin(UPrimitiveComponent* OverlappedComponent, 
 
 	if (AFGPlayer* Player = Cast<AFGPlayer>(OtherActor))
 	{
-		Player->TakeDamage(Damage);
+		Player->TakeRocketDamage(Damage);
 		UE_LOG(LogTemp, Warning, TEXT("Damage: %f"), Damage);
 	}
 }
