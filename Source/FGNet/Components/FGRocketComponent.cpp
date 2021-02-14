@@ -6,11 +6,8 @@
 #include <Kismet/GameplayStatics.h>
 #include "../Player/FGPlayer.h"
 
-// Sets default values for this component's properties
 UFGRocketComponent::UFGRocketComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 
 	PrimaryComponentTick.bStartWithTickEnabled = false;
@@ -18,20 +15,13 @@ UFGRocketComponent::UFGRocketComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-
-// Called when the game starts
 void UFGRocketComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
 	CachedCollisionQueryParams.AddIgnoredActor(GetOwner());
-	this->OnComponentBeginOverlap.AddDynamic(this, &UFGRocketComponent::OverlapBegin);
-
-	//SetRocketVisibility(false);
 }
 
-
-// Called every frame
 void UFGRocketComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -52,7 +42,7 @@ void UFGRocketComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 #endif
 
 	const FVector NewLocation = RocketStartLocation + FacingRotationStart * DistanceMoved;
-	/*MeshComponent->*/SetWorldLocation(NewLocation);
+	SetWorldLocation(NewLocation);
 
 	UE_LOG(LogTemp, Warning, TEXT("NewLocation: %s"), *NewLocation.ToString());
 
@@ -68,7 +58,6 @@ void UFGRocketComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 			if (AFGPlayer* Player = Cast<AFGPlayer>(HitActor))
 			{
 				Player->TakeRocketDamage(Damage);
-				UE_LOG(LogTemp, Warning, TEXT("Damage: %f"), Damage);
 			}
 		}
 		Explode();
@@ -85,7 +74,7 @@ void UFGRocketComponent::StartMoving(const FVector& Forward, const FVector& InSt
 	FacingRotationStart = Forward;
 	FacingRotationCorrection = FacingRotationStart.ToOrientationQuat();
 	RocketStartLocation = InStartLocation;
-	/*MeshComponent->*/SetWorldLocationAndRotation(InStartLocation, Forward.Rotation());
+	SetWorldLocationAndRotation(InStartLocation, Forward.Rotation());
 	bIsFree = false;
 	SetComponentTickEnabled(true);
 	SetRocketVisibility(true);
@@ -97,22 +86,6 @@ void UFGRocketComponent::StartMoving(const FVector& Forward, const FVector& InSt
 void UFGRocketComponent::ApplyCorrection(const FVector& Forward)
 {
 	FacingRotationCorrection = Forward.ToOrientationQuat();
-}
-
-
-
-void UFGRocketComponent::OverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	if (Cast<UFGRocketComponent>(OtherComp) || this->GetOwner() == OtherActor)
-	{
-		return;
-	}
-
-	if (AFGPlayer* Player = Cast<AFGPlayer>(OtherActor))
-	{
-		Player->TakeRocketDamage(Damage);
-		UE_LOG(LogTemp, Warning, TEXT("Damage: %f"), Damage);
-	}
 }
 
 void UFGRocketComponent::Explode()
@@ -134,6 +107,6 @@ void UFGRocketComponent::MakeFree()
 
 void UFGRocketComponent::SetRocketVisibility(bool bIsVisible)
 {
-	/*MeshComponent->*/SetVisibility(bIsVisible, true);
+	SetVisibility(bIsVisible, true);
 }
 

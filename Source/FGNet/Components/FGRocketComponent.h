@@ -56,9 +56,6 @@ public:
 
 	bool IsFree() const { return bIsFree; }
 
-	UFUNCTION(BlueprintCallable)
-	void OverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
 	void Explode();
 	void MakeFree();
 

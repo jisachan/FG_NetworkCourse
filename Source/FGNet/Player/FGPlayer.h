@@ -35,10 +35,10 @@ protected:
 	float Health = 100.f;
 
 	UPROPERTY(EditAnywhere, Category = PlayerStats, meta = (Tooltip = "How much ammo the player is able to carry."))
-		int AmmoCapacity = 20;
+		int32 AmmoCapacity = 20;
 
 	UPROPERTY(EditAnywhere, Category = PlayerStats, meta = (Tooltip = "How much ammo the player has at the start of game."))
-		int AmmoAtStart = 8;
+		int32 AmmoAtStart = 8;
 
 private:
 
@@ -166,6 +166,8 @@ public:
 	void SpawnRockets();
 	void FireRocket();
 
+	FVector GetLocation();
+
 private:
 
 	UFGRocketComponent* GetFreeRocket() const;
@@ -179,10 +181,10 @@ private:
 		void OnRepHealthChanged();
 
 	UFUNCTION(Server, Unreliable)
-		void Server_SendMovement(const FVector& ClientLocation, float TimeStamp, float ClientForward, float ClientYaw);
+		void Server_SendMovement(FVector ActorLocation, float TimeStamp, float ClientForward, /*float ClientYaw, */const FPlayerMovementStruct& SerializedMovement);
 
 	UFUNCTION(NetMulticast, Unreliable)
-		void Multicast_SendMovement(const FVector& InClientLocation, float TimeStamp, float ClientForward, float ClientYaw);
+		void Multicast_SendMovement(FVector ActorLocation, float TimeStamp, float ClientForward, /*float ClientYaw,*/ const FPlayerMovementStruct& SerializedMovement);
 
 	UFUNCTION(Server, Reliable)
 		void Server_FireRocket(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation);

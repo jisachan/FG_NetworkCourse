@@ -46,8 +46,6 @@ void AFGPlayer::BeginPlay()
 {
 	Super::BeginPlay();
 
-	PlayerMovement.SetMovementData(MoveData);
-
 	MovementComponent->SetUpdatedComponent(CollisionComponent);
 
 	CreateDebugWidget();
@@ -82,15 +80,15 @@ void AFGPlayer::Tick(float DeltaTime)
 	{
 		ClientTimeStamp += DeltaTime;
 
-		if (PlayerMovement.MovementData == nullptr)
+		if (MoveData == nullptr)
 		{
 			return;
 		}
 
-		const float MaxVelocity = PlayerMovement.MovementData->MaxVelocity;
-		const float Friction = IsBraking() ? PlayerMovement.MovementData->BrakingFriction : PlayerMovement.MovementData->Friction;
+		const float MaxVelocity = MoveData->MaxVelocity;
+		const float Friction = IsBraking() ? MoveData->BrakingFriction : MoveData->Friction;
 		const float Alpha = FMath::Clamp(FMath::Abs(MovementVelocity / (MaxVelocity * 0.75F)), 0.0F, 1.0F);
-		const float TurnSpeed = FMath::InterpEaseOut(0.0F, PlayerMovement.MovementData->TurnSpeedDefault, Alpha, 5.0F);
+		const float TurnSpeed = FMath::InterpEaseOut(0.0F, MoveData->TurnSpeedDefault, Alpha, 5.0F);
 		const float TurnDirection = MovementVelocity > 0.0F ? Turn : -Turn;
 
 		Yaw += (TurnDirection * TurnSpeed) * DeltaTime;
@@ -103,19 +101,19 @@ void AFGPlayer::Tick(float DeltaTime)
 		MovementComponent->ApplyGravity();
 		FrameMovement.AddDelta(GetActorForwardVector() * MovementVelocity * DeltaTime);
 		MovementComponent->Move(FrameMovement);
-
-		Server_SendMovement(GetActorLocation(), ClientTimeStamp, Forward, GetActorRotation().Yaw);
+		PlayerMovement.PlayerYaw = GetActorRotation().Yaw;
+		Server_SendMovement(GetActorLocation(), ClientTimeStamp, Forward,/* GetActorRotation().Yaw,*/ PlayerMovement);
 	}
 	else
 	{
-		const float Friction = IsBraking() ? PlayerMovement.MovementData->BrakingFriction : PlayerMovement.MovementData->Friction;
+		const float Friction = IsBraking() ? MoveData->BrakingFriction : MoveData->Friction;
 		MovementVelocity *= FMath::Pow(Friction, DeltaTime);
 		FrameMovement.AddDelta(GetActorForwardVector() * MovementVelocity * DeltaTime);
 		MovementComponent->Move(FrameMovement);
 
 		if (bPerformNetworkSmoothing)
 		{
-			const FVector NewRelativeLocation = FMath::VInterpTo(MeshComponent->GetRelativeLocation(), OriginalMeshOffset, LastCorrectionDelta, 1.75f);
+			const FVector NewRelativeLocation = FMath::VInterpTo(/*MeshComponent->GetRelativeLocation()*/GetActorLocation(), OriginalMeshOffset, LastCorrectionDelta, 1.75f);
 			UE_LOG(LogTemp, Warning, TEXT("NewRelativeLocation: %s"), *NewRelativeLocation.ToString());
 			MeshComponent->SetRelativeLocation(NewRelativeLocation);
 		}
@@ -148,12 +146,12 @@ int32 AFGPlayer::GetPing() const
 
 const static float MaxMoveDeltaTime = 0.125f;
 
-void AFGPlayer::Server_SendMovement_Implementation(const FVector& ClientLocation, float TimeStamp, float ClientForward, float ClientYaw)
+void AFGPlayer::Server_SendMovement_Implementation(FVector ActorLocation, float TimeStamp, float ClientForward/*, float ClientYaw*/, const FPlayerMovementStruct& SerializedMovement)
 {
-	Multicast_SendMovement(ClientLocation, TimeStamp, ClientForward, ClientYaw);
+	Multicast_SendMovement(ActorLocation, TimeStamp, ClientForward, /*ClientYaw, */SerializedMovement);
 }
 
-void AFGPlayer::Multicast_SendMovement_Implementation(const FVector& InClientLocation, float TimeStamp, float ClientForward, float ClientYaw)
+void AFGPlayer::Multicast_SendMovement_Implementation(FVector ActorLocation, float TimeStamp, float ClientForward/*, float ClientYaw*/, const FPlayerMovementStruct& SerializedMovement)
 {
 	if (!IsLocallyControlled())
 	{
@@ -162,21 +160,21 @@ void AFGPlayer::Multicast_SendMovement_Implementation(const FVector& InClientLoc
 		ClientTimeStamp = TimeStamp;
 
 		AddMovementVelocity(DeltaTime);
-		MovementComponent->SetFacingRotation(FRotator(0.0f, ClientYaw, 0.0f));
+		MovementComponent->SetFacingRotation(FRotator(0.0f, /*ClientYaw*/ SerializedMovement.PlayerYaw, 0.0f));
 
-		const FVector DeltaDiff = InClientLocation - GetActorLocation();
+		const FVector DeltaDiff = ActorLocation - GetActorLocation();
 
 		if (DeltaDiff.SizeSquared() > FMath::Square(40.0f))
 		{
 			if (bPerformNetworkSmoothing)
 			{
 				const FScopedPreventAttachedComponentMove PreventMeshMove(MeshComponent);
-				MovementComponent->UpdatedComponent->SetWorldLocation(InClientLocation, false, nullptr, ETeleportType::TeleportPhysics);
+				MovementComponent->UpdatedComponent->SetWorldLocation(ActorLocation, false, nullptr, ETeleportType::TeleportPhysics);
 				LastCorrectionDelta = DeltaTime;
 			}
 			else
 			{
-				SetActorLocation(InClientLocation);
+				SetActorLocation(ActorLocation);
 			}
 		}
 	}
@@ -184,13 +182,13 @@ void AFGPlayer::Multicast_SendMovement_Implementation(const FVector& InClientLoc
 
 void AFGPlayer::AddMovementVelocity(float DeltaTime)
 {
-	if (PlayerMovement.MovementData == nullptr)
+	if (MoveData == nullptr)
 	{
 		return;
 	}
 
-	const float MaxVelocity = PlayerMovement.MovementData->MaxVelocity;
-	const float Acceleration = PlayerMovement.MovementData->Acceleration;
+	const float MaxVelocity = MoveData->MaxVelocity;
+	const float Acceleration = MoveData->Acceleration;
 	MovementVelocity += Forward * Acceleration * DeltaTime;
 	MovementVelocity = FMath::Clamp(MovementVelocity, -MaxVelocity, MaxVelocity);
 }
@@ -243,7 +241,7 @@ void AFGPlayer::FireRocket()
 		return;
 	}
 
-	FireCooldownElapsed = PlayerMovement.MovementData->FireCooldown;
+	FireCooldownElapsed = MoveData->FireCooldown;
 
 	if (GetLocalRole() >= ROLE_AutonomousProxy)
 	{
@@ -467,8 +465,8 @@ void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AFGPlayer, ReplicatedYaw);
-	DOREPLIFETIME(AFGPlayer, ReplicatedLocation);
+	//DOREPLIFETIME(AFGPlayer, ReplicatedYaw);
+	//DOREPLIFETIME(AFGPlayer, ReplicatedLocation);
 	DOREPLIFETIME(AFGPlayer, RocketCompInstances);
 	DOREPLIFETIME(AFGPlayer, NumRockets);
 	DOREPLIFETIME(AFGPlayer, Health);
