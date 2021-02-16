@@ -102,7 +102,11 @@ void AFGPlayer::Tick(float DeltaTime)
 		FrameMovement.AddDelta(GetActorForwardVector() * MovementVelocity * DeltaTime);
 		MovementComponent->Move(FrameMovement);
 		PlayerMovement.PlayerYaw = GetActorRotation().Yaw;
-		Server_SendMovement(GetActorLocation(), ClientTimeStamp, Forward,/* GetActorRotation().Yaw,*/ PlayerMovement);
+		PlayerMovement.ClientForward = Forward;
+		PlayerMovement.PlayerFriction = Friction;
+		PlayerMovement.PlayerBrakingFriction = Friction;
+		Server_SendMovement(GetActorLocation(), ClientTimeStamp, PlayerMovement);
+		UE_LOG(LogTemp, Warning, TEXT("Forward: %f"), Forward);
 	}
 	else
 	{
@@ -113,7 +117,7 @@ void AFGPlayer::Tick(float DeltaTime)
 
 		if (bPerformNetworkSmoothing)
 		{
-			const FVector NewRelativeLocation = FMath::VInterpTo(/*MeshComponent->GetRelativeLocation()*/GetActorLocation(), OriginalMeshOffset, LastCorrectionDelta, 1.75f);
+			const FVector NewRelativeLocation = FMath::VInterpTo(MeshComponent->GetRelativeLocation(), OriginalMeshOffset, LastCorrectionDelta, LocationLerpSpeed);
 			UE_LOG(LogTemp, Warning, TEXT("NewRelativeLocation: %s"), *NewRelativeLocation.ToString());
 			MeshComponent->SetRelativeLocation(NewRelativeLocation);
 		}
@@ -146,21 +150,23 @@ int32 AFGPlayer::GetPing() const
 
 const static float MaxMoveDeltaTime = 0.125f;
 
-void AFGPlayer::Server_SendMovement_Implementation(FVector ActorLocation, float TimeStamp, float ClientForward/*, float ClientYaw*/, const FPlayerMovementStruct& SerializedMovement)
+void AFGPlayer::Server_SendMovement_Implementation(FVector_NetQuantize100 ActorLocation, float TimeStamp, const FPlayerMovementStruct& SerializedMovement)
 {
-	Multicast_SendMovement(ActorLocation, TimeStamp, ClientForward, /*ClientYaw, */SerializedMovement);
+	Multicast_SendMovement(ActorLocation, TimeStamp, SerializedMovement);
 }
 
-void AFGPlayer::Multicast_SendMovement_Implementation(FVector ActorLocation, float TimeStamp, float ClientForward/*, float ClientYaw*/, const FPlayerMovementStruct& SerializedMovement)
+void AFGPlayer::Multicast_SendMovement_Implementation(FVector_NetQuantize100 ActorLocation, float TimeStamp,const FPlayerMovementStruct& SerializedMovement)
 {
 	if (!IsLocallyControlled())
 	{
-		Forward = ClientForward;
+		Forward = SerializedMovement.ClientForward;
 		const float DeltaTime = FMath::Min(TimeStamp - ClientTimeStamp, MaxMoveDeltaTime);
 		ClientTimeStamp = TimeStamp;
-
+		const float Friction = IsBraking() ? SerializedMovement.PlayerBrakingFriction : SerializedMovement.PlayerFriction;
+		UE_LOG(LogTemp, Warning, TEXT("%i Friction: %f"), GetLocalRole(), Friction);
+		MovementVelocity *= FMath::Pow(Friction, DeltaTime);
 		AddMovementVelocity(DeltaTime);
-		MovementComponent->SetFacingRotation(FRotator(0.0f, /*ClientYaw*/ SerializedMovement.PlayerYaw, 0.0f));
+		MovementComponent->SetFacingRotation(FRotator(0.0f, SerializedMovement.PlayerYaw, 0.0f));
 
 		const FVector DeltaDiff = ActorLocation - GetActorLocation();
 
@@ -274,7 +280,7 @@ void AFGPlayer::TakeRocketDamage(float Damage)
 	}
 }
 
-void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation)
+void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, const FVector_NetQuantize100& RocketStartLocation, const FRotator& RocketFacingRotation)
 {
 	if ((ServerNumRockets - 1) < 0 && !bUnlimitedRockets)
 	{
@@ -289,7 +295,7 @@ void AFGPlayer::Server_FireRocket_Implementation(UFGRocketComponent* NewRocket, 
 	}
 }
 
-void AFGPlayer::Multicast_FireRocket_Implementation(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation)
+void AFGPlayer::Multicast_FireRocket_Implementation(UFGRocketComponent* NewRocket, const FVector_NetQuantize100& RocketStartLocation, const FRotator& RocketFacingRotation)
 {
 	if (!ensure(NewRocket != nullptr))
 	{
@@ -376,6 +382,9 @@ int32 AFGPlayer::GetNumActiveRockets() const
 void AFGPlayer::Handle_Accelerate(float Value)
 {
 	Forward = Value;
+
+	//To test decimals:
+	//Forward = Value/4.2;
 }
 
 void AFGPlayer::Handle_Turn(float Value)
@@ -465,8 +474,6 @@ void AFGPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	//DOREPLIFETIME(AFGPlayer, ReplicatedYaw);
-	//DOREPLIFETIME(AFGPlayer, ReplicatedLocation);
 	DOREPLIFETIME(AFGPlayer, RocketCompInstances);
 	DOREPLIFETIME(AFGPlayer, NumRockets);
 	DOREPLIFETIME(AFGPlayer, Health);

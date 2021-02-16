@@ -47,14 +47,8 @@ private:
 	UPROPERTY(Replicated, Transient)
 		TArray<UFGRocketComponent*> RocketCompInstances;
 
-	UPROPERTY(Replicated)
-		FVector ReplicatedLocation;
-
 	UPROPERTY(Replicated, ReplicatedUsing = OnRepNumRocketsChanged)
 		int32 NumRockets = 0;
-
-	UPROPERTY(Replicated)
-		float ReplicatedYaw = 0.0f;
 
 #pragma endregion
 
@@ -92,8 +86,8 @@ private:
 	UPROPERTY(EditAnywhere)
 		float LocationLerpSpeed = 5.f;
 
-	UPROPERTY(EditAnywhere)
-		float RotationLerpSpeed = 5.f;
+	//UPROPERTY(EditAnywhere)
+	//	float RotationLerpSpeed = 5.f;
 
 	UPROPERTY(EditAnywhere, Category = Network)
 		bool bPerformNetworkSmoothing = false;
@@ -181,16 +175,16 @@ private:
 		void OnRepHealthChanged();
 
 	UFUNCTION(Server, Unreliable)
-		void Server_SendMovement(FVector ActorLocation, float TimeStamp, float ClientForward, /*float ClientYaw, */const FPlayerMovementStruct& SerializedMovement);
+		void Server_SendMovement(FVector_NetQuantize100 ActorLocation, float TimeStamp,/* float ClientForward, *//*float ClientYaw, */const FPlayerMovementStruct& SerializedMovement);
 
 	UFUNCTION(NetMulticast, Unreliable)
-		void Multicast_SendMovement(FVector ActorLocation, float TimeStamp, float ClientForward, /*float ClientYaw,*/ const FPlayerMovementStruct& SerializedMovement);
+		void Multicast_SendMovement(FVector_NetQuantize100 ActorLocation, float TimeStamp, /*float ClientForward, *//*float ClientYaw,*/ const FPlayerMovementStruct& SerializedMovement);
 
 	UFUNCTION(Server, Reliable)
-		void Server_FireRocket(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation);
+		void Server_FireRocket(UFGRocketComponent* NewRocket, const FVector_NetQuantize100& RocketStartLocation, const FRotator& RocketFacingRotation);
 
 	UFUNCTION(NetMulticast, Reliable)
-		void Multicast_FireRocket(UFGRocketComponent* NewRocket, const FVector& RocketStartLocation, const FRotator& RocketFacingRotation);
+		void Multicast_FireRocket(UFGRocketComponent* NewRocket, const FVector_NetQuantize100& RocketStartLocation, const FRotator& RocketFacingRotation);
 
 	UFUNCTION(Client, Reliable)
 		void Client_RemoveRocket(UFGRocketComponent* RocketToRemove);

@@ -12,10 +12,22 @@ struct FPlayerMovementStruct
 	GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	float PlayerYaw;
 
+	float PlayerYaw;
+	float ClientForward;
+	float PlayerFriction;
+	float PlayerBrakingFriction;
 	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess);
+
+private:
+
+	uint8 CompressUIntByte(float valueToCompress, float maxValue);
+	int8 CompressIntByte(float valueToCompress, float maxValue);
+	float DecompressByte(float compressedValue, float maxValue);
+	float MaxForward = 3.f;
+	float MaxFriction = 3.f;
+	int UInt8Size = 255;
+	int Int8Size = 127;
 };
 
 template<>
